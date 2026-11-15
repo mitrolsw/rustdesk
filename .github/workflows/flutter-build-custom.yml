@@ -55,13 +55,8 @@ env:
   PUBLISH_UPDATE_METADATA: "${{ inputs.publish-update-metadata }}"
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}-2"
 
-  # custom vars
-  RS_PUB_KEY: "co1vRo+9m47ZsXzr8jYd8bYLNQOnRntiXwU2FC29uD4="
-  RENDEZVOUS_SERVER: "screenshare.mitrol.it"
-  API_SERVER: "https://screenshare.mitrol.it/"
-  APP_BIN_NAME: "mitrol-screenshare"    # name of the generated binary (without .exe extension)
-
 jobs:
+
   validate-update-metadata-keys:
     runs-on: ubuntu-22.04
     permissions:
@@ -160,6 +155,23 @@ jobs:
           name: ${{ matrix.job.arch == 'aarch64' && 'bridge-artifact-flutter-3.44' || 'bridge-artifact' }}
           path: ./
 
+      - name: Read custom environment
+        shell: bash
+        run: |
+          if [ -f custom/.env ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+              # Skip empty lines and comments
+              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+              # Export only KEY=VALUE lines
+              if [[ "$line" =~ ^[a-zA-Z_][a-zA-Z0-9_]*= ]]; then
+                echo "$line" >> "$GITHUB_ENV"
+              fi
+            done < custom/.env
+          else
+            echo "ERROR: custom/.env not found"
+            exit 1
+          fi
+
       - name: Apply custom values
         shell: bash
         run: |
@@ -182,7 +194,6 @@ jobs:
           channel: "stable"
           flutter-version: ${{ matrix.job.arch == 'aarch64' && env.FLUTTER_WINDOWS_ARM_VERSION || env.FLUTTER_VERSION }}
           architecture: x64
-
 
       # https://github.com/flutter/flutter/issues/155685
       # x64 only: arm64 uses the stock native arm64 Windows engine, and the rustdesk/engine
@@ -255,6 +266,11 @@ jobs:
           head -n 100 "${VCPKG_ROOT}/buildtrees/ffmpeg/build-${{ matrix.job.vcpkg-triplet }}-rel-out.log" || true
         shell: bash
 
+      - name: Customize source files
+        shell: bash
+        run: |
+          chmod +x custom/patch.sh
+          custom/patch.sh
 
       - name: Build rustdesk
         run: |
