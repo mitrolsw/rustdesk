@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Outer monitor frame -->
+  <rect x="20" y="24" width="216" height="164" rx="22" fill="#ffffff" stroke="#0f172a" stroke-width="14" />
+
+  <!-- Monitor stand -->
+  <path d="M96 226 H160 M128 188 V226" stroke="#0f172a" stroke-width="14" stroke-linecap="round" />
+
+  <!-- Custom M logo (three vertical pillars with V-cut top) -->
+  <g fill="#0066cc">
+    <!-- Left pillar -->
+    <polygon points="56,52 99,68 99,162 56,162" />
+    <!-- Center pillar -->
+    <polygon points="107,71 128,79 149,71 149,162 107,162" />
+    <!-- Right pillar -->
+    <polygon points="157,68 200,52 200,162 157,162" />
+  </g>
+
+  <!-- Remote assistance badge (bottom-right) -->
+  <circle cx="198" cy="182" r="42" fill="#0f172a" stroke="#ffffff" stroke-width="8" />
+
+  <!-- Bidirectional remote arrows inside badge -->
+  <path d="M180 174 H214 L204 164 M216 190 H182 L192 200" fill="none" stroke="#38bdf8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+</svg>
