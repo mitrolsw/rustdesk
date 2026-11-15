@@ -59,6 +59,7 @@ env:
   RS_PUB_KEY: "co1vRo+9m47ZsXzr8jYd8bYLNQOnRntiXwU2FC29uD4="
   RENDEZVOUS_SERVER: "screenshare.mitrol.it"
   API_SERVER: "https://screenshare.mitrol.it/"
+  APP_BIN_NAME: "mitrol-screenshare"    # name of the generated binary (without .exe extension)
 
 jobs:
   validate-update-metadata-keys:
@@ -346,7 +347,7 @@ jobs:
           python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
           popd
           mkdir -p ./SignOutput
-          mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+          mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/${{ env.APP_BIN_NAME }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
@@ -357,13 +358,12 @@ jobs:
           # Keep the action's default x86 MSBuild for the existing x64 MSI job.
           msbuild-architecture: ${{ matrix.job.arch == 'aarch64' && 'arm64' || 'x86' }}
 
-
       - name: Upload signed Windows Flutter EXE
         if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA == 'true' && env.SIGN_BASE_URL != '-2'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: windows-flutter-${{ matrix.job.arch }}-exe
-          path: ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+          path: ./SignOutput/${{ env.APP_BIN_NAME }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
           if-no-files-found: error
 
       - name: Publish Release
@@ -373,6 +373,4 @@ jobs:
           prerelease: true
           tag_name: ${{ env.TAG_NAME }}
           files: |
-            ./SignOutput/rustdesk-*.msi
-            ./SignOutput/rustdesk-*.exe
-
+            ./SignOutput/${{ env.APP_BIN_NAME }}-*.exe
