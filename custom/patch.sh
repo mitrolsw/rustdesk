@@ -55,18 +55,26 @@ replace_safe() {
   echo "[$desc] ok"
 }
 
+# setting app icons (starts from custom/icon.svg)
+echo "Replacing icons..."
+
+cp -f  custom/icon.svg        flutter/assets/icon.svg
+cp -f  custom/icon.svg        res/scalable.svg
+cp -f  custom/icon.svg        res/logo.svg
+cp -f  custom/32x32.png       res/32x32.png
+cp -f  custom/64x64.png       res/64x64.png
+cp -f  custom/128x128.png     res/128x128.png
+cp -f  custom/128x128@2x.png  res/128x128@2x.png
+cp -f  custom/icon.ico        flutter/windows/runner/resources/app_icon.ico
+cp -f  custom/icon.ico        res/icon.ico
+cp -f  custom/icon.ico        res/tray-icon.ico
+
 # replacing source code values
 echo "Setting server values..."
-replace_safe "libs/hbb_common/src/config.rs" "rs-ny.rustdesk.com" "$RENDEZVOUS_SERVER" "Setting custom rendezvous server"
-replace_safe "libs/hbb_common/src/config.rs" "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=" "$RS_PUB_KEY" "Setting custom public key"
-
-# setting app icons
-echo "Replacing icons..."
-cp -f   custom/icon.svg   flutter/assets/icon.svg
-cp -f   custom/icon.svg   res/scalable.svg
-cp -f   custom/icon.ico   res/icon.ico
-cp -f   custom/icon.ico   res/tray-icon.ico
-cp -f   custom/icon.png   res/icon.png
+replace_safe "libs/hbb_common/src/config.rs" "rs-ny.rustdesk.com" "$RENDEZVOUS_SERVER" "Set custom Rendezvous server"
+replace_safe "src/common.rs" "https://admin.rustdesk.com" "$API_SERVER" "Set custom API server"
+replace_safe "libs/hbb_common/src/config.rs" "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=" "$RS_PUB_KEY" "Set custom public key"
+replace_safe "libs/hbb_common/src/config.rs" "APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())" "APP_NAME: RwLock<String> = RwLock::new(\"$APP_NAME\".to_owned())" "Set custom public key"
 
 # completed
 echo "Patch completed successfully"

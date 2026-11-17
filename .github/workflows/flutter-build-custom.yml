@@ -51,8 +51,8 @@ env:
   #signing keys env variable checks
   ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
   MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
-  UPLOAD_ARTIFACT: "${{ inputs.upload-artifact }}"
-  PUBLISH_UPDATE_METADATA: "${{ inputs.publish-update-metadata }}"
+  UPLOAD_ARTIFACT: true
+  PUBLISH_UPDATE_METADATA: false
   SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}-2"
 
 jobs:
@@ -312,6 +312,7 @@ jobs:
           } catch {
               Write-Host "Ingore the printer driver error."
           }
+
       - name: Run the Rust tests
         # x86_64 only: the tests are the same code on arm64, and that runner is the slow one.
         if: ${{ !inputs.upload-artifact && matrix.job.arch == 'x86_64' }}
@@ -353,18 +354,6 @@ jobs:
           name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
           path: rustdesk
 
-      - name: Verify Windows Flutter version
-        if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA == 'true'
-        shell: powershell
-        run: |
-          $reportedVersion = (& ".\rustdesk\rustdesk.exe" --version | Out-String).Trim()
-          if ($LASTEXITCODE -ne 0) {
-            throw "rustdesk --version exited with $LASTEXITCODE"
-          }
-          if ($reportedVersion -cne $env:VERSION) {
-            throw "RustDesk reports version '$reportedVersion', expected '$env:VERSION'"
-          }
-
       - name: Build self-extracted executable
         shell: bash
         if: env.UPLOAD_ARTIFACT == 'true'
@@ -372,7 +361,7 @@ jobs:
           sed -i '/dpiAware/d' res/manifest.xml
           pushd ./libs/portable
           pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/rustdesk.exe
+          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/$APP_BIN_NAME.exe
           popd
           mkdir -p ./SignOutput
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/${{ env.APP_BIN_NAME }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
@@ -385,14 +374,6 @@ jobs:
           # (C3859/C1076 were reported by HostX86\arm64\CL.exe).
           # Keep the action's default x86 MSBuild for the existing x64 MSI job.
           msbuild-architecture: ${{ matrix.job.arch == 'aarch64' && 'arm64' || 'x86' }}
-
-      - name: Upload signed Windows Flutter EXE
-        if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA == 'true' && env.SIGN_BASE_URL != '-2'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: windows-flutter-${{ matrix.job.arch }}-exe
-          path: ./SignOutput/${{ env.APP_BIN_NAME }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
-          if-no-files-found: error
 
       - name: Publish Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
