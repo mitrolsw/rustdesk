@@ -4,18 +4,27 @@
 set -euo pipefail
 
 # test if the environment is set (useful when debugging this script...)
-if [ -z "${RENDEZVOUS_SERVER:-}" ]; then
-  ENV_FILE="$(dirname "$0")/.env"
-  if [ -f "$ENV_FILE" ]; then
-    echo "Loading environment from $ENV_FILE"
-    set -a
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-    set +a
-  else
-    echo "ERROR: RENDEZVOUS_SERVER not set and $ENV_FILE not found"
-    exit 1
-  fi
+ENV_FILE="$(dirname "$0")/.env"
+if [ -f "$ENV_FILE" ]; then
+  echo "Loading environment from $ENV_FILE"
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Skip empty lines and comments
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    # Parse KEY=VALUE and strip surrounding quotes from value
+    if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$ ]]; then
+      key="${BASH_REMATCH[1]}"
+      val="${BASH_REMATCH[2]}"
+      # Remove surrounding double or single quotes if present
+      val="${val%\"}"
+      val="${val#\"}"
+      val="${val%\'}"
+      val="${val#\'}"
+      export "$key"="$val"
+    fi
+  done < "$ENV_FILE"
+else
+  echo "ERROR: file $ENV_FILE not found"
+  exit 1
 fi
 
 # replace_safe <file> <old> <new> [desc]
@@ -44,20 +53,21 @@ replace_safe() {
     exit 1
   fi
 
-  echo "[$desc] $old_count occurrence(s) in $file, replacing"
+  # print an unterminated message (will have the result appended)
+  echo -n "[$desc] $old_count occurrence(s) in $file, replacing..."
   sed -i "s|$old|$new|g" "$file"
 
   if grep -qF -- "$old" "$file"; then
+    echo " ERROR"
     echo "ERROR: '$desc' still present in $file after sed (escaping issue?)"
     exit 1
   fi
 
-  echo "[$desc] ok"
+  echo " OK"
 }
 
 # setting app icons (starts from custom/icon.svg)
 echo "Replacing icons..."
-
 cp -f  custom/icon.svg        flutter/assets/icon.svg
 cp -f  custom/icon.svg        res/scalable.svg
 cp -f  custom/icon.svg        res/logo.svg
@@ -70,11 +80,11 @@ cp -f  custom/icon.ico        res/icon.ico
 cp -f  custom/icon.ico        res/tray-icon.ico
 
 # replacing source code values
-echo "Setting server values..."
-replace_safe "libs/hbb_common/src/config.rs" "rs-ny.rustdesk.com" "$RENDEZVOUS_SERVER" "Set custom Rendezvous server"
-replace_safe "src/common.rs" "https://admin.rustdesk.com" "$API_SERVER" "Set custom API server"
-replace_safe "libs/hbb_common/src/config.rs" "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=" "$RS_PUB_KEY" "Set custom public key"
-replace_safe "libs/hbb_common/src/config.rs" "APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())" "APP_NAME: RwLock<String> = RwLock::new(\"$APP_NAME\".to_owned())" "Set custom public key"
+echo "Setting custom values..."
+replace_safe "libs/hbb_common/src/config.rs" "rs-ny.rustdesk.com" "$RENDEZVOUS_SERVER" "Set Rendezvous server"
+replace_safe "src/common.rs" "https://admin.rustdesk.com" "$API_SERVER" "Set API server"
+replace_safe "libs/hbb_common/src/config.rs" "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=" "$RS_PUB_KEY" "Set public key"
+replace_safe "libs/hbb_common/src/config.rs" "APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())" "APP_NAME: RwLock<String> = RwLock::new(\"$APP_NAME\".to_owned())" "Set application name"
 
 # completed
 echo "Patch completed successfully"
