@@ -182,7 +182,11 @@ jobs:
       - name: Apply customizations to source files
         shell: bash
         run: |
+          pip install resvg-py pillow
+          echo "Building icons..."
+          python custom/build-icons.py
           chmod +x custom/patch.sh
+          echo "Applying source patches..."
           custom/patch.sh
 
       - name: Install LLVM and Clang

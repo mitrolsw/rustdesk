@@ -1,9 +1,8 @@
-# ==================================================================
-# this script generates all the needed icons starting from icon.svg
-# ==================================================================
+# ==========================================================================
+# this script generates all the needed icons starting from "custom/icon.svg"
+# ==========================================================================
 import io
-from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPM
+import resvg_py
 from PIL import Image
 
 def savePng(img: Image, size: int, filename: str):
@@ -15,14 +14,9 @@ def saveIco(img: Image, filename: str):
   icon_sizes = [(16, 16), (32, 32), (48, 48), (256, 256)]
   destImg.save(filename, format="ICO", sizes=icon_sizes)
 
-# Load SVG vector graphics
-drawing = svg2rlg("custom/icon.svg")
-
-# Render high-resolution PNG to memory buffer
-png_buffer = io.BytesIO()
-renderPM.drawToFile(drawing, png_buffer, fmt="PNG", dpi=300)
-png_buffer.seek(0)
-img = Image.open(png_buffer).convert("RGBA")
+# Load SVG vector graphics and render it to memory buffer
+png_bytes = resvg_py.svg_to_bytes(svg_path="custom/icon.svg", width=512, height=512)
+img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
 
 # save versions
 savePng(img, 32, "custom/32x32.png")
