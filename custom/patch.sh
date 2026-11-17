@@ -8,6 +8,7 @@ ENV_FILE="$(dirname "$0")/.env"
 if [ -f "$ENV_FILE" ]; then
   echo "Loading environment from $ENV_FILE"
   while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
     # Skip empty lines and comments
     [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
     # Parse KEY=VALUE and strip surrounding quotes from value
@@ -87,4 +88,4 @@ replace_safe "libs/hbb_common/src/config.rs" "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGq
 replace_safe "libs/hbb_common/src/config.rs" "APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())" "APP_NAME: RwLock<String> = RwLock::new(\"$APP_NAME\".to_owned())" "Set application name"
 
 # completed
-echo "Patch completed successfully"
+echo "Customizations applied successfully"
