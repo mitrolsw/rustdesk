@@ -62,6 +62,13 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Generate timestamp tag
+        id: time_tag
+        run: |
+          # Generate UTC timestamp for unique tag name
+          TIMESTAMP=$(date -u +'%Y%m%d-%H%M%S')
+          echo "tag=build-${TIMESTAMP}" >> $GITHUB_OUTPUT
+
       - name: Checkout source code
         if: ${{ inputs.publish-update-metadata }}
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -379,6 +386,6 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA != 'true'
         with:
           prerelease: true
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ env.TAG_NAME }}-${{ steps.time_tag.outputs.tag }}
           files: |
             ./SignOutput/${{ env.APP_BIN_NAME }}-*.exe
