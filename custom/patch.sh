@@ -33,7 +33,7 @@ fi
 # - if neither <old> nor <new> is present, fail (source changed upstream)
 # - otherwise replace all occurrences of <old> with <new> and verify
 replace_safe() {
-  local file="$1" old="$2" new="$3" desc="${4:-$2}"
+  local desc="${1:-$2}" file="$2" old="$3" new="$4"
   local old_count new_count
 
   if [ ! -f "$file" ]; then
@@ -82,10 +82,60 @@ cp -f  custom/icon.ico        res/tray-icon.ico
 
 # replacing source code values
 echo "Setting custom values..."
-replace_safe "libs/hbb_common/src/config.rs" "rs-ny.rustdesk.com" "$RENDEZVOUS_SERVER" "Set Rendezvous server"
-replace_safe "src/common.rs" "https://admin.rustdesk.com" "$API_SERVER" "Set API server"
-replace_safe "libs/hbb_common/src/config.rs" "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=" "$RS_PUB_KEY" "Set public key"
-replace_safe "libs/hbb_common/src/config.rs" "APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())" "APP_NAME: RwLock<String> = RwLock::new(\"$APP_NAME\".to_owned())" "Set application name"
+replace_safe \
+  "Rendezvous server" \
+  "libs/hbb_common/src/config.rs" \
+  "rs-ny.rustdesk.com" \
+  "$RENDEZVOUS_SERVER"
+replace_safe \
+  "API server" \
+  "src/common.rs" \
+  "https://admin.rustdesk.com" \
+  "$API_SERVER"
+replace_safe \
+  "Public key" \
+  "libs/hbb_common/src/config.rs" \
+  "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=" \
+  "$RS_PUB_KEY"
+replace_safe \
+  "Application name" \
+  "libs/hbb_common/src/config.rs" \
+  "APP_NAME: RwLock<String> = RwLock::new(\"RustDesk\".to_owned())" \
+  "APP_NAME: RwLock<String> = RwLock::new(\"$APP_NAME\".to_owned())"
+
+if [[ "$CUSTOM_APP_URL" != "" ]]; then
+  replace_safe \
+    "App URL (1/2)" \
+    "src/ui/index.tis" \
+    "https://rustdesk.com" \
+    "$CUSTOM_APP_URL"
+  replace_safe \
+    "App URL (2/2)" \
+    "src/ui/index.tis" \
+    "$CUSTOM_APP_URL/blog" \
+    "https://rustdesk.com/blog"
+fi;
+if [[ "$CUSTOM_ALLOW_NUMERIC_ONE_TIME_PASSWORD" == "1" ]]; then
+  replace_safe \
+    "Numeric password" \
+    "flutter/lib/models/server_model.dart" \
+    "bool _allowNumericOneTimePassword = false;" \
+    "bool _allowNumericOneTimePassword = true;"
+fi;
+if [[ "$CUSTOM_TEMPORARY_PASSWORD_LENGTH" != "" ]]; then
+  replace_safe \
+    "Password length" \
+    "flutter/lib/models/server_model.dart" \
+    "String _temporaryPasswordLength = \"\";" \
+    "String _temporaryPasswordLength = \"$CUSTOM_TEMPORARY_PASSWORD_LENGTH\";"
+fi;
+if [[ "$CUSTOM_SET_ADAPTIVE_VIEW_STYLE" == "1" ]]; then
+  replace_safe \
+    "Adaptive view style" \
+    "flutter/lib/models/model.dart" \
+    "      style: ''," \
+    "      style: kRemoteViewStyleAdaptive,"
+fi;
 
 # completed
 echo "Customizations applied successfully"
