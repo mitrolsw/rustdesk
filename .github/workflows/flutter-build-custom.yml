@@ -65,8 +65,10 @@ jobs:
     permissions:
       contents: read
     steps:
+
       - name: Generate timestamp tag
         id: time_tag
+        shell: bash
         run: |
           # Generate UTC timestamp for unique tag name
           TIMESTAMP=$(date -u +'%Y%m%d-%H%M%S')
@@ -144,6 +146,15 @@ jobs:
               build-args: "--vram",
             }
     steps:
+
+      - name: Generate timestamp tag
+        id: time_tag
+        shell: bash
+        run: |
+          # Generate UTC timestamp for unique tag name
+          TIMESTAMP=$(date -u +'%Y%m%d-%H%M%S')
+          echo "tag=build-${TIMESTAMP}" >> $GITHUB_OUTPUT
+
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
         with:
