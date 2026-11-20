@@ -28,6 +28,32 @@ else
   exit 1
 fi
 
+# apply_patch_idempotent <desc> <patch_file>
+apply_patch_idempotent() {
+  local desc="$1" patch_file="$2"
+
+  if [ ! -f "$patch_file" ]; then
+    echo "ERROR: patch file not found: $patch_file"
+    exit 1
+  fi
+
+  if git apply --ignore-whitespace --check "$patch_file" 2>/dev/null; then
+    echo "[$desc] applying $patch_file..."
+    git apply "$patch_file"
+    echo "[$desc] applied OK"
+    return 0
+  fi
+
+  if git apply --ignore-whitespace --reverse --check "$patch_file" 2>/dev/null; then
+    echo "[$desc] already applied, skipping"
+    return 0
+  fi
+
+  echo "ERROR: [$desc] failed to apply $patch_file (conflict or upstream drift)"
+  git apply --ignore-whitespace --check "$patch_file"
+  exit 1
+}
+
 # replace_safe <file> <old> <new> [desc]
 # - if <old> is absent but <new> is already present, treat as already patched (no error)
 # - if neither <old> nor <new> is present, fail (source changed upstream)
@@ -155,11 +181,9 @@ if [[ "$CUSTOM_APP_URL" != "" ]]; then
     "https://rustdesk.com/blog"
 fi;
 if [[ "$CUSTOM_ALLOW_NUMERIC_ONE_TIME_PASSWORD" == "1" ]]; then
-  replace_safe \
-    "Numeric password (set to $CUSTOM_ALLOW_NUMERIC_ONE_TIME_PASSWORD)" \
-    "flutter/lib/models/server_model.dart" \
-    "bool _allowNumericOneTimePassword = false;" \
-    "bool _allowNumericOneTimePassword = true;"
+  apply_patch_idempotent \
+    "Allow numeric numeric one-time password (set to enabled)" \
+    "./custom/diffs/allow-numeric-one-time-password.diff"
 fi;
 if [[ "$CUSTOM_TEMPORARY_PASSWORD_LENGTH" != "" ]]; then
   replace_safe \
@@ -169,12 +193,15 @@ if [[ "$CUSTOM_TEMPORARY_PASSWORD_LENGTH" != "" ]]; then
     "String _temporaryPasswordLength = \"$CUSTOM_TEMPORARY_PASSWORD_LENGTH\";"
 fi;
 if [[ "$CUSTOM_SET_ADAPTIVE_VIEW_STYLE" == "1" ]]; then
-  replace_safe \
+  apply_patch_idempotent \
     "Adaptive view style" \
-    "flutter/lib/models/model.dart" \
-    "      style: ''," \
-    "      style: kRemoteViewStyleAdaptive,"
+    ./custom/diffs/set-adaptive-view-style.diff
 fi;
+
+# apply patches
+apply_patch_idempotent \
+  "Disable custom.txt file signature validation" \
+  ./custom/diffs/disable-signature-check.diff
 
 # completed
 echo "Customizations applied successfully"
