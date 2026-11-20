@@ -67,6 +67,45 @@ replace_safe() {
   echo " OK"
 }
 
+# replace_regex_safe <desc> <file> <old_regex> <new_replacement>
+# - if <old_regex> matches nothing but <new_replacement> is already present, treat as already patched
+# - if neither matches, fail (upstream source changed or regex is wrong)
+# - otherwise replace all regex matches and verify no match remains
+replace_regex_safe() {
+  local desc="${1:-$3}" file="$2" old_re="$3" new_str="$4"
+  local old_count new_count
+
+  if [ ! -f "$file" ]; then
+    echo "ERROR: file not found: $file"
+    exit 1
+  fi
+
+  old_count=$(grep -cE -- "$old_re" "$file" || true)
+
+  if [ "$old_count" -eq 0 ]; then
+    # Regex did not match: check if replacement is already applied
+    new_count=$(grep -cF -- "$new_str" "$file" || true)
+    if [ "$new_count" -gt 0 ]; then
+      echo "[$desc] already patched in $file, skipping"
+      return 0
+    fi
+    echo "ERROR: '$desc' not found in $file and replacement not present either (upstream changed the source?)"
+    exit 1
+  fi
+
+  # Print an unterminated message (will have the result appended)
+  echo -n "[$desc] $old_count matching line(s) in $file, replacing..."
+  sed -i -E "s|$old_re|$new_str|g" "$file"
+
+  if grep -qE -- "$old_re" "$file"; then
+    echo " ERROR"
+    echo "ERROR: '$desc' still matches in $file after sed (check regex or delimiter '|')"
+    exit 1
+  fi
+
+  echo " OK"
+}
+
 # setting app icons (starts from custom/icon.svg)
 echo "Replacing icons..."
 cp -f  custom/icon.svg        flutter/assets/icon.svg
@@ -117,14 +156,14 @@ if [[ "$CUSTOM_APP_URL" != "" ]]; then
 fi;
 if [[ "$CUSTOM_ALLOW_NUMERIC_ONE_TIME_PASSWORD" == "1" ]]; then
   replace_safe \
-    "Numeric password" \
+    "Numeric password (set to $CUSTOM_ALLOW_NUMERIC_ONE_TIME_PASSWORD)" \
     "flutter/lib/models/server_model.dart" \
     "bool _allowNumericOneTimePassword = false;" \
     "bool _allowNumericOneTimePassword = true;"
 fi;
 if [[ "$CUSTOM_TEMPORARY_PASSWORD_LENGTH" != "" ]]; then
   replace_safe \
-    "Password length" \
+    "Password length (set to $CUSTOM_TEMPORARY_PASSWORD_LENGTH)" \
     "flutter/lib/models/server_model.dart" \
     "String _temporaryPasswordLength = \"\";" \
     "String _temporaryPasswordLength = \"$CUSTOM_TEMPORARY_PASSWORD_LENGTH\";"
