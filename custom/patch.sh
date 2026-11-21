@@ -51,6 +51,7 @@ apply_patch_idempotent() {
 
   echo "ERROR: [$desc] failed to apply $patch_file (conflict or upstream drift)"
   git apply --ignore-whitespace --check "$patch_file"
+  sed -n '2600,2630p' src/common.rs
   exit 1
 }
 
