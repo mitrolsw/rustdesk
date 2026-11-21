@@ -200,9 +200,9 @@ if [[ "$CUSTOM_SET_ADAPTIVE_VIEW_STYLE" == "1" ]]; then
 fi;
 
 # apply patches
-apply_patch_idempotent \
-  "Disable custom.txt file signature validation" \
-  ./custom/diffs/disable-signature-check.diff
+#apply_patch_idempotent \
+#  "Disable custom.txt file signature validation" \
+#  ./custom/diffs/disable-signature-check.diff
 
 # completed
 echo "Customizations applied successfully"
