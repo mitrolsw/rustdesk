@@ -1,11 +1,12 @@
-from pathlib import Path
+import base64
 import io
 import json
 import os
+import resvg_py
 import shutil
 import subprocess
 import sys
-import resvg_py
+from pathlib import Path
 from PIL import Image
 
 def load_env_file(env_path: Path) -> None:
@@ -51,7 +52,6 @@ def run_cmd(args: list[str], capture: bool = False) -> subprocess.CompletedProce
     check=False,
   )
 
-
 def apply_patch_idempotent(desc: str, patch_file: Path) -> None:
   # Apply a git diff idempotently while ignoring whitespace/CRLF differences
   if not patch_file.is_file():
@@ -89,7 +89,6 @@ def apply_patch_idempotent(desc: str, patch_file: Path) -> None:
 
   sys.exit(1)
 
-
 def replace_in_file(file_path: Path, old: str, new: str) -> None:
   # Perform a direct string replacement on a text file
   if not file_path.is_file():
@@ -99,7 +98,6 @@ def replace_in_file(file_path: Path, old: str, new: str) -> None:
   content = file_path.read_text(encoding="utf-8")
   updated = content.replace(old, new)
   file_path.write_text(updated, encoding="utf-8", newline="\n")
-
 
 def set_icons() -> None:
   # Copy custom icons into target Flutter and resource directories
@@ -131,28 +129,45 @@ def set_icons() -> None:
   shutil.copy(Path("custom/tmp/icon.ico")       , Path("res/icon.ico"))
   shutil.copy(Path("custom/tmp/icon.ico")       , Path("res/tray-icon.ico"))
 
+def _env_flag(name: str) -> bool:
+  # Safely read optional boolean flags without failing when unset
+  return (os.getenv(name) or "").strip().upper() == "Y"
+
+def _env_str(name: str) -> str:
+  # Safely read optional string environment variables
+  return (os.getenv(name) or "").strip()
+
 def build_custom_config_file():
   # Initialize root structure with empty setting maps
   default_settings: dict[str, str] = {}
   override_settings: dict[str, str] = {}
 
-  # Conditionally populate default-settings entries
-  if os.getenv("CUSTOM_ALLOW_NUMERIC_ONE_TIME_PASSWORD").strip().upper() == "Y":
+  # populate default-settings entries
+  if _env_flag("CUSTOM_ALLOW_NUMERIC_ONE_TIME_PASSWORD"):
     default_settings["allow-numeric-one-time-password"] = "Y"
-  temp_pwd_len = (os.getenv("CUSTOM_TEMPORARY_PASSWORD_LENGTH") or "").strip()
+  temp_pwd_len = _env_str("CUSTOM_TEMPORARY_PASSWORD_LENGTH")
   if temp_pwd_len:
     default_settings["temporary-password-length"] = temp_pwd_len
   if os.getenv("CUSTOM_SET_ADAPTIVE_VIEW_STYLE").strip().upper() == "Y":
     default_settings["view-style"] = "adaptive"
 
   # set server data
-  override_settings["custom-rendezvous-server"] = os.getenv("CUSTOM_RENDEZVOUS_SERVER")
-  override_settings["api-server"] = os.getenv("CUSTOM_API_SERVER")
-  override_settings["relay-server"] = os.getenv("CUSTOM_RELAY_SERVER")
-  override_settings["key"] = os.getenv("CUSTOM_PUB_KEY")
+  override_settings["custom-rendezvous-server"] = _env_str("CUSTOM_RENDEZVOUS_SERVER")
+  override_settings["api-server"] = _env_str("CUSTOM_API_SERVER")
+  override_settings["relay-server"] = _env_str("CUSTOM_RELAY_SERVER")
+  override_settings["key"] = _env_str("CUSTOM_PUB_KEY")
 
+  # set network options
+  if _env_flag("CUSTOM_ENABLE_PUNCH"):
+    override_settings["enable-tcp-punch"] = "Y"
+    override_settings["enable-udp-punch"] = "Y"
+    override_settings["enable-ipv6-punch"] = "Y"
+  if _env_flag("CUSTOM_ENABLE_WEBRTC"):
+    override_settings["enable-webrtc"] = "Y"
+
+  # write final JSON (in .txt file)
   config_data: dict[str, object] = {
-    "app-name": os.getenv("CUSTOM_APP_NAME"),
+    "app-name": os.getenv("CUSTOM_APP_NAME") or "MyApp",
     "default-settings": default_settings,
     "override-settings": override_settings,
   }
@@ -162,7 +177,7 @@ def build_custom_config_file():
   output.write_text(json_text, encoding="utf-8", newline="\n")
 
   print("Custom config saved to ", output)
-  print(json_text)
+  # print(json_text)
 
 
 def main() -> None:
