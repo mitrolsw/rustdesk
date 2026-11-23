@@ -358,18 +358,18 @@ jobs:
           name: ${{ matrix.job.arch == 'aarch64' && 'topmostwindow-artifacts-ARM64' || 'topmostwindow-artifacts-x64' }}
           path: "./rustdesk"
 
+      - name: Copy custom config file
+        shell: bash
+        if: env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          cp -fv custom/tmp/custom.txt rustdesk
+
       - name: Upload unsigned
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
           path: rustdesk
-
-      - name: Copy custom config file
-        shell: bash
-        if: env.UPLOAD_ARTIFACT == 'true'
-        run: |
-          cp -fv custom/tmp/custom.txt rustdesk
 
       - name: Build self-extracted executable
         shell: bash
