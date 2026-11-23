@@ -1,4 +1,4 @@
-name: Build a custom version of flutter version of the RustDesk
+name: Custom - Build a custom flutter version of the RustDesk
 
 on:
   workflow_dispatch:
@@ -371,17 +371,23 @@ jobs:
           name: rustdesk-unsigned-windows-${{ matrix.job.arch }}
           path: rustdesk
 
-      - name: Build self-extracted executable
+      - name: Build self-extracting executable (with wrappe)
         shell: bash
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           sed -i '/dpiAware/d' res/manifest.xml
-          pushd ./libs/portable
-          pip3 install -r requirements.txt
-          python3 ./generate.py -f ../../rustdesk/ -o . -e ../../rustdesk/$CUSTOM_APP_ID.exe
-          popd
+          curl -L -o wrappe.exe https://github.com/Systemcluster/wrappe/releases/download/v1.0.6/wrappe.exe
           mkdir -p ./SignOutput
-          mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/${{ env.CUSTOM_APP_ID }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+          ./wrappe.exe \
+            ./rustdesk/ \
+            ${{ env.CUSTOM_APP_ID }}.exe \
+            ./SignOutput/${{ env.CUSTOM_APP_ID }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe \
+            --unpack-target temp \
+            --unpack-directory ${{ env.CUSTOM_APP_ID }} \
+            --cleanup \
+            --versioning replace \
+            --once \
+            --compression 22
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2

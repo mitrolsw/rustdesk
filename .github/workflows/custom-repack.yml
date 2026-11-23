@@ -1,0 +1,157 @@
+name: Custom - Repack an existing build artefacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload-artifact:
+        type: boolean
+        default: true
+      run_id:
+        description: 'Run ID of the build to use'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  SCITER_RUST_VERSION: "1.75" # https://github.com/rustdesk/rustdesk/discussions/7503, also 1.78 has ABI change which causes our sciter version not working, https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
+  RUST_VERSION: "1.75" # sciter failed on m1 with 1.78 because of https://blog.rust-lang.org/2024/03/30/i128-layout-update.html
+  MAC_RUST_VERSION: "1.81" # 1.81 is requred for macos, because of https://github.com/yury/cidre requires 1.81
+  CARGO_NDK_VERSION: "3.1.2"
+  SCITER_ARMV7_CMAKE_VERSION: "3.29.7"
+  SCITER_NASM_DEBVERSION: "2.15.05-1"
+  LLVM_VERSION: "15.0.6"
+  FLUTTER_VERSION: "3.24.5"
+  ANDROID_FLUTTER_VERSION: "3.24.5"
+  # Windows arm64 only: the first stable Flutter to ship a native arm64 Windows Dart SDK +
+  # engine is 3.44. Every other platform except macOS arm64 (below) stays on FLUTTER_VERSION
+  # (3.24.5) until Windows 7 support is restored after the upstream-wide Flutter bump. The 3.44
+  # jobs patch the few 3.44-only source/pubspec changes on the fly (see "Patch RustDesk sources
+  # for Flutter 3.44").
+  FLUTTER_WINDOWS_ARM_VERSION: "3.44.9"
+  # macOS arm64 only: 3.24.5's engine crashes in attributedSubstringForProposedRange
+  # (https://github.com/rustdesk/rustdesk/issues/16817, https://github.com/flutter/flutter/issues/153157).
+  # x86_64 stays on FLUTTER_VERSION: 3.44's FlutterMacOS needs macOS 10.15 there, and it targets 10.14.
+  FLUTTER_MACOS_ARM_VERSION: "3.44.9"
+  # for arm64 linux because official Dart SDK does not work
+  FLUTTER_ELINUX_VERSION: "3.16.9"
+  TAG_NAME: "custom"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  # vcpkg version: 2026.07.29
+  # If we change the `VCPKG COMMIT_ID`, please remember:
+  # 1. Call `$VCPKG_ROOT/vcpkg x-update-baseline` to update the baseline in `vcpkg.json`.
+  #  Or we may face build issue like
+  #  https://github.com/rustdesk/rustdesk/actions/runs/14414119794/job/40427970174
+  # 2. Update the `VCPKG_COMMIT_ID` in `ci.yml` and `playground.yml`.
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  VCPKG_CMAKE_VERSION: "4.3.0"
+  ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836" # 2025.01.13, got "/opt/artifacts/vcpkg/vcpkg: No such file or directory" with latest version
+  VERSION: "1.5.3"
+  NDK_VERSION: "r28c"
+  #signing keys env variable checks
+  ANDROID_SIGNING_KEY: "${{ secrets.ANDROID_SIGNING_KEY }}"
+  MACOS_P12_BASE64: "${{ secrets.MACOS_P12_BASE64 }}"
+  UPLOAD_ARTIFACT: true
+  PUBLISH_UPDATE_METADATA: false
+  SIGN_BASE_URL: "${{ secrets.SIGN_BASE_URL }}-2"
+
+jobs:
+
+  repack:
+    name: ${{ matrix.job.target }}
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        job:
+          # - { target: i686-pc-windows-msvc        , os: windows-2022                  }
+          # - { target: x86_64-pc-windows-gnu       , os: windows-2022                  }
+          - {
+              target: x86_64-pc-windows-msvc,
+              os: windows-2022,
+              arch: x86_64,
+              flutter-arch: x64,
+              vcpkg-triplet: x64-windows-static,
+              build-args: "--vram",
+            }
+    steps:
+
+      - name: Generate timestamp tag
+        id: time_tag
+        shell: bash
+        run: |
+          # Generate UTC timestamp for unique tag name
+          TIMESTAMP=$(date -u +'%Y%m%d-%H%M%S')
+          echo "tag=build-${TIMESTAMP}" >> $GITHUB_OUTPUT
+
+      - name: Checkout source code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: recursive
+
+      - name: Read custom environment
+        shell: bash
+        run: |
+          if [ -f custom/.env ]; then
+            while IFS= read -r line || [ -n "$line" ]; do
+              # Skip empty lines and comments
+              [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+              # Parse KEY=VALUE and strip surrounding quotes from value
+              if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$ ]]; then
+                key="${BASH_REMATCH[1]}"
+                val="${BASH_REMATCH[2]}"
+                # Remove surrounding double or single quotes
+                val="${val%\"}"
+                val="${val#\"}"
+                val="${val%\'}"
+                val="${val#\'}"
+                echo "$key=$val" >> "$GITHUB_ENV"
+              fi
+            done < custom/.env
+          else
+            echo "ERROR: custom/.env not found"
+            exit 1
+          fi
+
+      - name: Apply customizations to source files
+        shell: bash
+        run: |
+          pip install resvg-py pillow
+          echo "Apply source patches..."
+          python custom/patch-sources.py
+
+      - name: Download existing artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          run_id: ${{ inputs.run_id }}
+          name: rustdesk-unsigned-windows-x86_64
+          path: ./rustdesk
+          if_no_artifact_found: fail
+
+      - name: Build self-extracting executable (with wrappe)
+        shell: bash
+        if: env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          sed -i '/dpiAware/d' res/manifest.xml
+          curl -L -o wrappe.exe https://github.com/Systemcluster/wrappe/releases/download/v1.0.6/wrappe.exe
+          mkdir -p ./SignOutput
+          ./wrappe.exe \
+            ./rustdesk/ \
+            ${{ env.CUSTOM_APP_ID }}.exe \
+            ./SignOutput/${{ env.CUSTOM_APP_ID }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe \
+            --unpack-target temp \
+            --unpack-directory ${{ env.CUSTOM_APP_ID }} \
+            --cleanup \
+            --versioning replace \
+            --once \
+            --compression 22
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        if: env.UPLOAD_ARTIFACT == 'true' && env.PUBLISH_UPDATE_METADATA != 'true'
+        with:
+          prerelease: true
+          tag_name: ${{ env.TAG_NAME }}-${{ steps.time_tag.outputs.tag }}
+          files: |
+            ./SignOutput/${{ env.CUSTOM_APP_ID }}-*.exe
