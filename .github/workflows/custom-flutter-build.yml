@@ -196,6 +196,8 @@ jobs:
 
       - name: Apply customizations to source files
         shell: bash
+        env:
+          CUSTOM_PUB_KEY: ${{ secrets.CUSTOM_PUB_KEY }}
         run: |
           pip install resvg-py pillow
           echo "Apply source patches..."
