@@ -34,14 +34,17 @@ def load_env_file(env_path: Path) -> None:
     if key:
       os.environ[key] = val
 
+
 def savePng(img: Image, size: int, filename: str):
   destImg = img.resize((size, size), Image.Resampling.LANCZOS)
   destImg.save(filename, format="PNG")
+
 
 def saveIco(img: Image, filename: str):
   destImg = img.resize((256, 256), Image.Resampling.LANCZOS)
   icon_sizes = [(16, 16), (32, 32), (48, 48), (256, 256)]
   destImg.save(filename, format="ICO", sizes=icon_sizes)
+
 
 def run_cmd(args: list[str], capture: bool = False) -> subprocess.CompletedProcess[str]:
   # Execute external commands cleanly without shell escaping issues
@@ -51,6 +54,7 @@ def run_cmd(args: list[str], capture: bool = False) -> subprocess.CompletedProce
     capture_output=capture,
     check=False,
   )
+
 
 def apply_patch_idempotent(desc: str, patch_file: Path) -> None:
   # Apply a git diff idempotently while ignoring whitespace/CRLF differences
@@ -89,15 +93,22 @@ def apply_patch_idempotent(desc: str, patch_file: Path) -> None:
 
   sys.exit(1)
 
-def replace_in_file(file_path: Path, old: str, new: str) -> None:
+
+def replace_in_file(desc: str, file_path: Path, old: str, new: str) -> None:
+
   # Perform a direct string replacement on a text file
+  print(f"[{desc}] Patching file: {file_path}")
   if not file_path.is_file():
     print(f"ERROR: file not found: {file_path}", file=sys.stderr)
     sys.exit(1)
 
   content = file_path.read_text(encoding="utf-8")
   updated = content.replace(old, new)
-  file_path.write_text(updated, encoding="utf-8", newline="\n")
+  if content != updated:
+    file_path.write_text(updated, encoding="utf-8", newline="\n")
+  else:
+    print(f"WARNING: search text not found in file: {file_path}", file=sys.stdout)
+
 
 def set_icons() -> None:
   # Copy custom icons into target Flutter and resource directories
@@ -129,13 +140,16 @@ def set_icons() -> None:
   shutil.copy(Path("custom/tmp/icon.ico")       , Path("res/icon.ico"))
   shutil.copy(Path("custom/tmp/icon.ico")       , Path("res/tray-icon.ico"))
 
+
 def _env_flag(name: str) -> bool:
   # Safely read optional boolean flags without failing when unset
   return (os.getenv(name) or "").strip().upper() == "Y"
 
-def _env_str(name: str) -> str:
+
+def _env_str(name: str, default: str = "") -> str:
   # Safely read optional string environment variables
-  return (os.getenv(name) or "").strip()
+  return (os.getenv(name) or default).strip()
+
 
 def build_custom_config_file():
   # Initialize root structure with empty setting maps
@@ -195,11 +209,64 @@ def main() -> None:
   build_custom_config_file()
 
   # raw patches
-  custom_app_url = os.environ.get("CUSTOM_APP_URL", "")
-  if custom_app_url != "":
+  custom_app_url = _env_str("CUSTOM_APP_URL")
+  if custom_app_url:
     index_tis = Path("src/ui/index.tis")
-    replace_in_file(index_tis, "https://rustdesk.com", custom_app_url)
-    replace_in_file(index_tis, f"{custom_app_url}/blog", "https://rustdesk.com/blog")
+    replace_in_file(
+      "App URL (main)",
+      index_tis,
+      "https://rustdesk.com",
+      custom_app_url
+    )
+    replace_in_file(
+      "App URL (blog)",
+      index_tis,
+      f"{custom_app_url}/blog",
+      "https://rustdesk.com/blog"
+    )
+
+  # windows binary info data
+  runner_rc = Path("flutter/windows/runner/Runner.rc")
+  replace_in_file(
+    "Product name",
+    runner_rc,
+    r'VALUE "ProductName", "RustDesk" "\0"',
+    fr'VALUE "ProductName", "{_env_str("CUSTOM_APP_NAME")}" "\0"'
+  )
+  replace_in_file(
+    "Original filename",
+    runner_rc,
+    r'VALUE "OriginalFilename", "rustdesk.exe" "\0"',
+    fr'VALUE "OriginalFilename", "{_env_str("CUSTOM_APP_ID")}.exe" "\0"'
+  )
+  replace_in_file(
+    "Product version",
+    runner_rc,
+    r'VALUE "ProductVersion", VERSION_AS_STRING "\0"',
+    fr'VALUE "ProductVersion", "{_env_str("CUSTOM_PRODUCT_VERSION", _env_str("VERSION"))}" "\0"'
+  )
+  replace_in_file(
+    "Company name",
+    runner_rc,
+    r'VALUE "CompanyName", "Purslane Tech Pte. Ltd." "\0"',
+    fr'VALUE "CompanyName", "{_env_str("CUSTOM_COMPANY_NAME")}" "\0"'
+  )
+  custom_copyright = _env_str("CUSTOM_COPYRIGHT")
+  if custom_copyright:
+    replace_in_file(
+      "Copyright",
+      runner_rc,
+      r'VALUE "LegalCopyright", "Copyright © 2026 Purslane Tech Pte. Ltd. All rights reserved." "\0"',
+      fr'VALUE "LegalCopyright", "{custom_copyright}" "\0"'
+    )
+  custom_file_description = _env_str("CUSTOM_FILE_DESCRIPTION")
+  if custom_file_description:
+    replace_in_file(
+      "File description",
+      runner_rc,
+      r'VALUE "FileDescription", "RustDesk Remote Desktop" "\0"',
+      fr'VALUE "FileDescription", "{custom_file_description}" "\0"'
+    )
 
   # source patches
   apply_patch_idempotent(
