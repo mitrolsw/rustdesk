@@ -140,12 +140,12 @@ jobs:
             ./rustdesk/ \
             ${{ env.CUSTOM_APP_ID }}.exe \
             ./SignOutput/${{ env.CUSTOM_APP_ID }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe \
-            --unpack-target temp \
+            --unpack-target local \
             --unpack-directory ${{ env.CUSTOM_APP_ID }} \
             --cleanup \
             --versioning replace \
             --once \
-            --compression 22
+            --compression 16
 
       - name: Publish Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
