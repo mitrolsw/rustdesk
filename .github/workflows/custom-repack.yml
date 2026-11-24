@@ -136,11 +136,13 @@ jobs:
           sed -i '/dpiAware/d' res/manifest.xml
           curl -L -o wrappe.exe https://github.com/Systemcluster/wrappe/releases/download/v1.0.6/wrappe.exe
           mkdir -p ./SignOutput
+          # --unpack-target should be "local" and not "temp"
+          # to avoid being flagged as suspicious by AV engines
           ./wrappe.exe \
             ./rustdesk/ \
             ${{ env.CUSTOM_APP_ID }}.exe \
             ./SignOutput/${{ env.CUSTOM_APP_ID }}-${{ env.VERSION }}-${{ matrix.job.arch }}.exe \
-            --unpack-target temp \
+            --unpack-target local \
             --unpack-directory ${{ env.CUSTOM_APP_ID }} \
             --cleanup \
             --versioning replace \
